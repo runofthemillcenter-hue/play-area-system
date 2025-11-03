@@ -1142,7 +1142,7 @@ function updateVisitorCounts() {
 function loadVisitHistory() {
     const historyList = document.getElementById('history-list');
     if (!historyList) return;
-    
+
     historyList.innerHTML = `
         <thead>
             <tr>
@@ -1160,36 +1160,38 @@ function loadVisitHistory() {
         </thead>
         <tbody></tbody>
     `;
-    
+
     // Get data
-    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
-    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
-    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
-    
+    const parents = JSON.parse(localStorage.getItem('playAreaParents')) || [];
+    const children = JSON.parse(localStorage.getItem('playAreaChildren')) || [];
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits')) || [];
+
+    // Filter for completed visits
+    const completedVisits = visits.filter(visit => visit.checkOutTime);
+
     // Sort visits by check-in time (most recent first)
-    const sortedVisits = [...visits].sort((a, b) => {
+    const sortedVisits = [...completedVisits].sort((a, b) => {
         return new Date(b.checkInTime) - new Date(a.checkInTime);
     });
-    
+
+    const tbody = historyList.querySelector('tbody');
+
     // Display visits
     sortedVisits.forEach(visit => {
         const child = children.find(c => c.id === visit.childId);
         const parent = parents.find(p => p.id === visit.parentId);
-        
+
         if (child && parent) {
             const row = document.createElement('tr');
-            
-            // Calculate duration if checked out
-            let duration = 'Still Active';
-            if (visit.checkOutTime) {
-                const checkInTime = new Date(visit.checkInTime);
-                const checkOutTime = new Date(visit.checkOutTime);
-                const durationMs = checkOutTime - checkInTime;
-                const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
-                const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-                duration = `${durationHours}h ${durationMinutes}m`;
-            }
-            
+
+            // Calculate duration
+            const checkInTime = new Date(visit.checkInTime);
+            const checkOutTime = new Date(visit.checkOutTime);
+            const durationMs = checkOutTime - checkInTime;
+            const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+            const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            const duration = `${durationHours}h ${durationMinutes}m`;
+
             row.innerHTML = `
                 <td><input type="checkbox" data-email="${parent.email || ''}"></td>
                 <td>${child.name}</td>
@@ -1197,12 +1199,12 @@ function loadVisitHistory() {
                 <td>${parent.name}</td>
                 <td>${parent.phoneNumber}</td>
                 <td>${parent.email || 'N/A'}</td>
-                <td>${formatDateTime(new Date(visit.checkInTime))}</td>
-                <td>${visit.checkOutTime ? formatDateTime(new Date(visit.checkOutTime)) : 'Active'}</td>
+                <td>${formatDateTime(checkInTime)}</td>
+                <td>${formatDateTime(checkOutTime)}</td>
                 <td>${duration}</td>
                 <td>${child.visitCount || 1}</td>
             `;
-            historyList.querySelector('tbody').appendChild(row);
+            tbody.appendChild(row);
         }
     });
 }

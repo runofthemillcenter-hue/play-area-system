@@ -87,10 +87,12 @@ header {
     flex: 1;
     max-width: 600px; /* Limit size for better visual grouping */
     margin: 0 10px;
-    padding: 10px;
-    background-color: var(--light-gray); /* Different color for visibility */
+    padding: 0; /* Removed padding to make buttons fill the box */
+    background-color: white; /* Changed to white */
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
+    border: 2px solid var(--medium-gray); /* Added a border for the box effect */
+    overflow: hidden; /* Ensures buttons fit within the border radius */
 }
 
 .main-actions-container .tab-btn {
@@ -98,6 +100,10 @@ header {
     min-width: 150px;
     font-size: 1.2rem;
     padding: 20px 15px;
+    border-radius: 0; /* Remove individual button radius */
+    border: none; /* Remove individual button border */
+    background-color: var(--light-gray); /* Default background for tabs */
+    color: var(--text-color);
 }
 
 .tab-btn {
@@ -113,6 +119,8 @@ header {
     text-align: center;
     min-width: 100px;
     min-height: 60px; /* Increased for better touch targets */
+    /* Added border to separate the two main tabs */
+    border-right: 1px solid var(--medium-gray);
 }
 
 .tab-btn:hover {
@@ -120,17 +128,14 @@ header {
 }
 
 .tab-btn.active {
-    color: var(--primary-color);
+    color: white; /* Active text color is white */
+    background-color: var(--primary-color); /* Active background color */
+    border-right: 1px solid white; /* Separator for active tabs */
+    border-left: 1px solid white;
 }
 
 .tab-btn.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background-color: var(--primary-color);
+    content: none; /* Remove the bottom line effect */
 }
 
 /* Tab Content */
