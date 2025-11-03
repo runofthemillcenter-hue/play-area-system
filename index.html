@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Of The Mill Play Centre</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Email.js for bulk email functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3.2.0/dist/email.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand-logo">
+                <h1><span class="brand-red">Run</span> <span class="brand-yellow">Of The</span> <span class="brand-blue">Mill</span> <span class="brand-text">Play Centre</span></h1>
+            </div>
+        </header>
+
+        <main>
+            <div class="tabs">
+                <div class="main-actions-container">
+                    <button class="tab-btn active" data-tab="sign-in">Check In</button>
+                    <button class="tab-btn" data-tab="check-out">Check Out</button>
+                </div>
+                <div class="admin-dropdown">
+                    <button class="admin-dropdown-btn">
+                        <i class="fas fa-cog"></i> Admin
+                    </button>
+                    <div class="admin-dropdown-content">
+                        <button class="tab-btn" data-tab="history">Visit History</button>
+                        <button class="tab-btn" data-tab="active-customers">Active Visitors</button>
+                        <button class="tab-btn" data-tab="settings">Settings</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content">
+                <!-- Sign-In Form Tab -->
+                <div class="tab-pane active" id="sign-in">
+                    <h2>New Visitor Check-In</h2>
+                    
+                    
+                    
+                    <div class="form-container">
+                        <!-- Parent Information Form -->
+                        <div id="parent-info-form" class="form-section">
+                            <h3>Parent Information</h3>
+                            <form id="parent-form">
+                                <div class="form-group">
+                                    <label for="parent-name">Parent's Name <span class="required">*</span></label>
+                                    <input type="text" id="parent-name" name="parent-name" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="parent-email">Email Address <span class="required">*</span></label>
+                                    <input type="email" id="parent-email" name="parent-email" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="phone-number">Phone Number <span class="required">*</span></label>
+                                    <input type="tel" id="phone-number" name="phone-number" pattern="[0-9]*" inputmode="numeric" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="adults-count">Number of Adults <span class="required">*</span></label>
+                                    <input type="number" id="adults-count" name="adults-count" min="1" value="1" pattern="[0-9]*" inputmode="numeric" required>
+                                </div>
+                                
+                                <button type="submit" class="btn primary-btn">Continue to Add Children <i class="fas fa-arrow-right"></i></button>
+                            </form>
+                        </div>
+                        
+                        <!-- Child Information Form (initially hidden) -->
+                        <div id="child-info-form" class="form-section" style="display: none;">
+                            <h3>Child Information</h3>
+                            <form id="child-form">
+                                <div class="form-group">
+                                    <label for="child-name">Child's Name <span class="required">*</span></label>
+                                    <input type="text" id="child-name" name="child-name" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="child-age">Child's Age <span class="required">*</span></label>
+                                    <input type="number" id="child-age" name="child-age" min="1" max="15" pattern="[0-9]*" inputmode="numeric" required>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" id="add-child-btn" class="btn primary-btn">Add Child <i class="fas fa-plus"></i></button>
+                                    <button type="button" id="finish-checkin-btn" class="btn secondary-btn">Finish Check-In <i class="fas fa-check"></i></button>
+                                    <button type="button" id="back-to-parent-btn" class="btn text-btn"><i class="fas fa-arrow-left"></i> Back to Parent Info</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Children List (initially hidden) -->
+                        <div id="children-list-container" class="form-section" style="display: none;">
+                            <h3>Children Added</h3>
+                            <div class="table-responsive">
+                                <table class="children-table" id="children-list">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Age</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Children will be added here dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        <!-- Success Message (initially hidden) -->
+                        <div id="checkin-success" style="display: none;">
+                            <div class="success-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <h3>Check-In Successful!</h3>
+                            <p>Your children have been checked in successfully.</p>
+                            <button id="new-checkin-btn" class="btn primary-btn">New Check-In <i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Check Out Tab -->
+                <div class="tab-pane" id="check-out">
+                    <h2>Visitor Check-Out</h2>
+                    
+                    <div class="search-container">
+                        <input type="text" id="checkout-search" placeholder="Search by name...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="customers-table" id="checkout-list">
+                            <!-- Active visitors will be loaded here -->
+                        </table>
+                    </div>
+                    
+                    <div id="no-active-visitors-checkout" class="no-visitors-message" style="display: none;">
+                        <p>There are no active visitors to check out.</p>
+                        <button id="new-check-in-btn-checkout" class="btn primary-btn">New Check-In <i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+                
+                <!-- Active Visitors Tab -->
+                <div class="tab-pane" id="active-customers">
+                    <h2>Active Visitors</h2>
+                    
+                    <!-- Visitor Statistics -->
+                    <div class="visitor-stats">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-child"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="children-count">0</div>
+                                <div class="stat-label">Children</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="adults-count-display">0</div>
+                                <div class="stat-label">Adults</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-count">0</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Controls -->
+                    <div class="filter-controls">
+                        <div class="filter-group">
+                            <label for="visit-count-filter">Regular Visitors:</label>
+                            <select id="visit-count-filter">
+                                <option value="all">All Visitors</option>
+                                <option value="3">3+ Visits</option>
+                                <option value="5">5+ Visits</option>
+                                <option value="10">10+ Visits</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="age-filter">Age Group:</label>
+                            <select id="age-filter">
+                                <option value="all">All Ages</option>
+                                <option value="0-2">0-2 years</option>
+                                <option value="3-5">3-5 years</option>
+                                <option value="6-8">6-8 years</option>
+                                <option value="9-12">9-12 years</option>
+                                <option value="13+">13+ years</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="search-container">
+                        <input type="text" id="active-search" placeholder="Search by name...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="customers-table" id="active-customers-list">
+                            <!-- Active visitors will be loaded here -->
+                        </table>
+                    </div>
+                    
+                    <div id="no-active-visitors" class="no-visitors-message" style="display: none;">
+                        <p>There are no active visitors at the moment.</p>
+                        <button id="new-check-in-btn" class="btn primary-btn">New Check-In <i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+                
+                <!-- Visit History Tab -->
+                <div class="tab-pane" id="history">
+                    <h2>Visit History</h2>
+                    
+                    <!-- Filter Controls -->
+                    <div class="filter-controls">
+                        <div class="filter-group">
+                            <label for="date-from">From:</label>
+                            <input type="date" id="date-from">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="date-to">To:</label>
+                            <input type="date" id="date-to">
+                        </div>
+                        
+                        <button id="filter-btn" class="btn secondary-btn"><i class="fas fa-filter"></i> Filter</button>
+                    </div>
+                    
+                    <div class="filter-controls">
+                        <div class="filter-group">
+                            <label for="history-visit-count-filter">Min Visits:</label>
+                            <select id="history-visit-count-filter">
+                                <option value="0">Any</option>
+                                <option value="1">1+</option>
+                                <option value="2">2+</option>
+                                <option value="3">3+ (Regular)</option>
+                                <option value="5">5+</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="history-age-filter">Max Age:</label>
+                            <select id="history-age-filter">
+                                <option value="15">Any</option>
+                                <option value="5">5</option>
+                                <option value="8">8</option>
+                                <option value="10">10</option>
+                                <option value="12">12</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="search-container">
+                        <input type="text" id="history-search" placeholder="Search by name...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="customers-table" id="history-list">
+                            <thead>
+                                <tr>
+                                    <th>Child Name</th>
+                                    <th>Age</th>
+                                    <th>Parent Name</th>
+                                    <th>Check-In Time</th>
+                                    <th>Check-Out Time</th>
+                                    <th>Duration</th>
+                                    <th>Visit Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Visit history will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button id="export-btn" class="btn secondary-btn"><i class="fas fa-file-export"></i> Export Data</button>
+                        <button id="send-bulk-email-btn" class="btn primary-btn"><i class="fas fa-envelope"></i> Send Email to All Parents</button>
+                    </div>
+                    
+                    <!-- Email Template (initially hidden) -->
+                    <div id="email-template-container" style="display: none;">
+                        <h3>Send Email to All Parents</h3>
+                        <div class="form-group">
+                            <label for="email-subject">Subject:</label>
+                            <input type="text" id="email-subject" placeholder="Enter email subject...">
+                        </div>
+                        <div class="form-group">
+                            <label for="email-body">Message:</label>
+                            <textarea id="email-body" placeholder="Enter your message..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button id="send-email-btn" class="btn primary-btn"><i class="fas fa-paper-plane"></i> Send Email</button>
+                            <button id="cancel-email-btn" class="btn danger-btn"><i class="fas fa-times"></i> Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Tab -->
+                <div class="tab-pane" id="settings">
+                    <h2>Settings</h2>
+                    
+                    <div class="form-section">
+                        <h3>Data Management</h3>
+                        <div class="form-actions">
+                            <button id="backup-btn" class="btn secondary-btn"><i class="fas fa-download"></i> Backup Data</button>
+                            <button id="restore-btn" class="btn secondary-btn"><i class="fas fa-upload"></i> Restore Data</button>
+                            <button id="delete-history-btn" class="btn warning-btn"><i class="fas fa-trash-alt"></i> Delete Old Records</button>
+                            <button id="delete-all-btn" class="btn danger-btn"><i class="fas fa-trash-alt"></i> Delete All Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; <span id="current-year"></span> Run Of The Mill Play Centre. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3 id="modal-title">Confirmation</h3>
+            <p id="modal-message">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="btn primary-btn">Confirm</button>
+                <button id="modal-cancel" class="btn danger-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QR Scanner Modal -->
+    <div id="qr-scanner-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Scan QR Code</h3>
+            <div id="qr-video-container">
+                <video id="qr-video" playsinline></video>
+            </div>
+            <p>Position the QR code within the camera view.</p>
+            <button id="cancel-scan-btn" class="btn danger-btn">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Email Status Modal -->
+    <div id="email-status-modal" class="modal">
+        <div class="modal-content">
+            <h3>Sending Emails</h3>
+            <div class="progress-container">
+                <div id="email-progress-bar" class="progress-bar"></div>
+            </div>
+            <p id="email-status-message">Preparing to send emails...</p>
+            <p id="email-count">0/0 emails sent</p>
+            <button id="close-email-status-btn" class="btn primary-btn" style="display: none;">Close</button>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

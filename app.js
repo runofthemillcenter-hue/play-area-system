@@ -1,0 +1,1676 @@
+// Main JavaScript for Run Of The Mill Play Centre Check-In/Out System
+
+// Initialize local storage structure if not exists
+function initializeLocalStorage() {
+    if (!localStorage.getItem('playAreaParents')) {
+        localStorage.setItem('playAreaParents', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('playAreaChildren')) {
+        localStorage.setItem('playAreaChildren', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('playAreaVisits')) {
+        localStorage.setItem('playAreaVisits', JSON.stringify([]));
+    }
+}
+
+// Generate unique ID
+function generateUniqueId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// Temporary array to store children during check-in process
+let currentChildren = [];
+
+// DOM Elements
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize local storage
+    initializeLocalStorage();
+    
+    // Set current year in footer
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+    
+    // Tab Navigation
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Remove active class from all buttons and panes
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+            
+            // Add active class to clicked button and corresponding pane
+            button.classList.add('active');
+            const tabId = button.getAttribute('data-tab');
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update visitor counts when active visitors tab is selected
+            if (tabId === 'active-customers') {
+                updateVisitorCounts();
+            }
+            
+            // Refresh checkout list when checkout tab is selected
+            if (tabId === 'check-out') {
+                loadCheckoutList();
+            }
+        });
+    });
+    
+    // Parent Form Submission - FIX: Added preventDefault and explicit transition
+    const parentForm = document.getElementById('parent-form');
+    const phoneNumberInput = document.getElementById('phone-number');
+    
+    // Function to check for returning customer and pre-fill form
+    function checkReturningCustomer() {
+        const phoneNumber = phoneNumberInput.value.trim();
+        if (phoneNumber.length >= 5) { // Check after a few digits are entered
+            const parents = JSON.parse(localStorage.getItem('playAreaParents') || '[]');
+            const existingParent = parents.find(p => p.phoneNumber === phoneNumber);
+            
+            if (existingParent) {
+                document.getElementById('parent-name').value = existingParent.name;
+                document.getElementById('parent-email').value = existingParent.email;
+                document.getElementById('adults-count').value = existingParent.adultsCount;
+                // Optional: Show a message to the user
+                console.log('Returning customer found. Form pre-filled.');
+            }
+        }
+    }
+    
+    if (phoneNumberInput) {
+        // Add event listener for input change (e.g., when user finishes typing)
+        phoneNumberInput.addEventListener('blur', checkReturningCustomer);
+    }
+    
+    if (parentForm) {
+        parentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Hide parent form and show child form
+            document.getElementById('parent-info-form').style.display = 'none';
+            document.getElementById('child-info-form').style.display = 'block';
+            document.getElementById('children-list-container').style.display = 'block';
+            
+            // Focus on first field in child form
+            document.getElementById('child-name').focus();
+        });
+    }
+    
+    // Child Form Submission (Add Child button)
+    const childForm = document.getElementById('child-form');
+    if (childForm) {
+        childForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addChildToList();
+            
+            // Clear child form for next child
+            childForm.reset();
+            
+            // Focus on child name field for next entry
+            document.getElementById('child-name').focus();
+        });
+    }
+    
+    // Finish Check-In button
+    const finishCheckinBtn = document.getElementById('finish-checkin-btn');
+    if (finishCheckinBtn) {
+        finishCheckinBtn.addEventListener('click', function() {
+            if (currentChildren.length === 0) {
+                alert('Please add at least one child before completing check-in.');
+                return;
+            }
+            completeCheckin();
+        });
+    }
+    
+    // Back to Parent Info button
+    const backToParentBtn = document.getElementById('back-to-parent-btn');
+    if (backToParentBtn) {
+        backToParentBtn.addEventListener('click', function() {
+            document.getElementById('child-info-form').style.display = 'none';
+            document.getElementById('children-list-container').style.display = 'none';
+            document.getElementById('parent-info-form').style.display = 'block';
+        });
+    }
+    
+    // New Check-In button after successful check-in
+    const newCheckinBtn = document.getElementById('new-checkin-btn');
+    if (newCheckinBtn) {
+        newCheckinBtn.addEventListener('click', function() {
+            resetCheckinForm();
+        });
+    }
+    
+
+    
+    // Group Checkout Button
+    const groupCheckoutBtn = document.getElementById('group-checkout-btn');
+    if (groupCheckoutBtn) {
+        groupCheckoutBtn.addEventListener('click', showGroupCheckoutModal);
+    }
+    
+    // New Check-In buttons from other tabs
+    const newCheckInBtn = document.getElementById('new-check-in-btn');
+    if (newCheckInBtn) {
+        newCheckInBtn.addEventListener('click', function() {
+            document.querySelector('[data-tab="sign-in"]').click();
+            resetCheckinForm();
+        });
+    }
+    
+    const newCheckInBtnCheckout = document.getElementById('new-check-in-btn-checkout');
+    if (newCheckInBtnCheckout) {
+        newCheckInBtnCheckout.addEventListener('click', function() {
+            document.querySelector('[data-tab="sign-in"]').click();
+            resetCheckinForm();
+        });
+    }
+    
+    // Visit Count Filter
+    const visitCountFilter = document.getElementById('visit-count-filter');
+    if (visitCountFilter) {
+        visitCountFilter.addEventListener('change', function() {
+            filterActiveVisitors();
+        });
+    }
+    
+    // Age Filter
+    const ageFilter = document.getElementById('age-filter');
+    if (ageFilter) {
+        ageFilter.addEventListener('change', function() {
+            filterActiveVisitors();
+        });
+    }
+    
+    // Modal functionality
+    const modal = document.getElementById('confirmation-modal');
+    const closeModal = document.querySelector('.close-modal');
+    const modalCancel = document.getElementById('modal-cancel');
+    
+    // Close modal when clicking the X
+    if (closeModal) {
+        closeModal.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+    
+    // Close modal when clicking Cancel
+    if (modalCancel) {
+        modalCancel.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+    
+
+    
+    // Delete history button
+    const deleteHistoryBtn = document.getElementById('delete-history-btn');
+    if (deleteHistoryBtn) {
+        deleteHistoryBtn.addEventListener('click', () => {
+            showConfirmationModal(
+                'Delete History',
+                'Are you sure you want to delete old visit records? This action cannot be undone.',
+                deleteHistory
+            );
+        });
+    }
+    
+    // Delete all data button
+    const deleteAllBtn = document.getElementById('delete-all-btn');
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', () => {
+            showConfirmationModal(
+                'Delete All Data',
+                'Are you sure you want to delete all data? All customer information and visit records will be permanently removed. This action cannot be undone.',
+                deleteAllData
+            );
+        });
+    }
+    
+    // Backup button
+    const backupBtn = document.getElementById('backup-btn');
+    if (backupBtn) {
+        backupBtn.addEventListener('click', createBackup);
+    }
+    
+    // Restore button
+    const restoreBtn = document.getElementById('restore-btn');
+    if (restoreBtn) {
+        restoreBtn.addEventListener('click', restoreBackup);
+    }
+    
+    // Export button
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportData);
+    }
+    
+    // Filter button
+    const filterBtn = document.getElementById('filter-btn');
+    if (filterBtn) {
+        filterBtn.addEventListener('click', filterHistory);
+    }
+    
+    // Search functionality
+    const activeSearch = document.getElementById('active-search');
+    if (activeSearch) {
+        activeSearch.addEventListener('input', () => {
+            searchCustomers(activeSearch.value, 'active-customers-list');
+        });
+    }
+    
+    const historySearch = document.getElementById('history-search');
+    if (historySearch) {
+        historySearch.addEventListener('input', () => {
+            searchCustomers(historySearch.value, 'history-list');
+        });
+    }
+    
+    const checkoutSearch = document.getElementById('checkout-search');
+    if (checkoutSearch) {
+        checkoutSearch.addEventListener('input', () => {
+            searchCustomers(checkoutSearch.value, 'checkout-list');
+        });
+    }
+    
+    // Bulk email button
+    const sendBulkEmailBtn = document.getElementById('send-bulk-email-btn');
+    if (sendBulkEmailBtn) {
+        sendBulkEmailBtn.addEventListener('click', function() {
+            document.getElementById('email-template-container').style.display = 'block';
+            this.style.display = 'none';
+        });
+    }
+    
+    // Send email button
+    const sendEmailBtn = document.getElementById('send-email-btn');
+    if (sendEmailBtn) {
+        sendEmailBtn.addEventListener('click', sendBulkEmail);
+    }
+    
+    // Cancel email button
+    const cancelEmailBtn = document.getElementById('cancel-email-btn');
+    if (cancelEmailBtn) {
+        cancelEmailBtn.addEventListener('click', function() {
+            document.getElementById('email-template-container').style.display = 'none';
+            document.getElementById('send-bulk-email-btn').style.display = 'block';
+            document.getElementById('email-subject').value = '';
+            document.getElementById('email-body').value = '';
+        });
+    }
+    
+    // Close email status button
+    const closeEmailStatusBtn = document.getElementById('close-email-status-btn');
+    if (closeEmailStatusBtn) {
+        closeEmailStatusBtn.addEventListener('click', function() {
+            document.getElementById('email-status-modal').style.display = 'none';
+        });
+    }
+    
+    // Input validation for numeric fields
+    const phoneInput = document.getElementById('phone-number');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+    
+    const childAgeInput = document.getElementById('child-age');
+    if (childAgeInput) {
+        childAgeInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+    
+    const adultsCountInput = document.getElementById('adults-count');
+    if (adultsCountInput) {
+        adultsCountInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+    
+    // Load initial data
+    loadActiveCustomers();
+    loadVisitorCounts();
+    loadCheckoutList();
+    loadVisitHistory();
+});
+
+// Add child to the temporary list
+function addChildToList() {
+    const childName = document.getElementById('child-name').value;
+    const childAge = document.getElementById('child-age').value;
+    
+    // Add to temporary array
+    currentChildren.push({
+        name: childName,
+        age: parseInt(childAge)
+    });
+    
+    // Update the children list display
+    updateChildrenList();
+}
+
+// Update the children list display
+function updateChildrenList() {
+    const childrenList = document.getElementById('children-list');
+    childrenList.innerHTML = '';
+    
+    currentChildren.forEach((child, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${child.name}</td>
+            <td>${child.age}</td>
+            <td>
+                <button class="btn small-btn danger-btn remove-child-btn" data-index="${index}">
+                    <i class="fas fa-times"></i> Remove
+                </button>
+            </td>
+        `;
+        childrenList.appendChild(row);
+    });
+    
+    // Add event listeners to remove buttons
+    const removeButtons = document.querySelectorAll('.remove-child-btn');
+    removeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            removeChild(index);
+        });
+    });
+}
+
+// Remove child from temporary list
+function removeChild(index) {
+    currentChildren.splice(index, 1);
+    updateChildrenList();
+}
+
+// Complete the check-in process
+function completeCheckin() {
+    // Check if any children have been added
+    if (currentChildren.length === 0) {
+        alert('Please add at least one child before completing check-in.');
+        return;
+    }
+    
+    // Get parent information
+    const parentName = document.getElementById('parent-name').value;
+    const parentEmail = document.getElementById('parent-email').value;
+    const phoneNumber = document.getElementById('phone-number').value;
+    const adultsCount = parseInt(document.getElementById('adults-count').value);
+    
+    // Save parent
+    const parentId = saveParent(parentName, parentEmail, phoneNumber, adultsCount);
+    
+    // Process each child
+    currentChildren.forEach(child => {
+        // Save child
+        const childId = saveChild(child.name, child.age, parentId);
+        
+        // Check in child
+        checkInChild(childId, parentId);
+    });
+    
+    // Reset form and return to main screen instead of showing success message
+    resetCheckinForm();
+    
+    // Update visitor counts
+    updateVisitorCounts();
+}
+
+// Reset the check-in form for a new customer
+function resetCheckinForm() {
+    // Clear all form fields
+    document.getElementById('parent-form').reset();
+    document.getElementById('child-form').reset();
+    
+    // Clear temporary children array
+    currentChildren = [];
+    updateChildrenList();
+    
+    // Reset form visibility
+    document.getElementById('checkin-success').style.display = 'none';
+    document.getElementById('parent-info-form').style.display = 'block';
+    document.getElementById('child-info-form').style.display = 'none';
+    document.getElementById('children-list-container').style.display = 'none';
+    
+    // Focus on parent name field
+    document.getElementById('parent-name').focus();
+}
+
+// Save parent to local storage
+function saveParent(parentName, parentEmail, phoneNumber, adultsCount) {
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    
+    // Check if parent already exists (by email or phone)
+    let existingParent = null;
+    
+    if (parentEmail) {
+        existingParent = parents.find(p => p.email && p.email.toLowerCase() === parentEmail.toLowerCase());
+    }
+    
+    if (!existingParent) {
+        existingParent = parents.find(p => 
+            p.name.toLowerCase() === parentName.toLowerCase() && 
+            p.phoneNumber === phoneNumber
+        );
+    }
+    
+    if (existingParent) {
+        // Update parent information
+        existingParent.name = parentName;
+        existingParent.email = parentEmail;
+        existingParent.phoneNumber = phoneNumber;
+        existingParent.adultsCount = parseInt(adultsCount);
+        existingParent.lastVisit = new Date().toISOString();
+        
+        localStorage.setItem('playAreaParents', JSON.stringify(parents));
+        return existingParent.id;
+    }
+    
+    // Create new parent
+    const newParent = {
+        id: generateUniqueId(),
+        name: parentName,
+        email: parentEmail,
+        phoneNumber: phoneNumber,
+        adultsCount: parseInt(adultsCount),
+        qrCodeGenerated: false,
+        firstVisit: new Date().toISOString(),
+        lastVisit: new Date().toISOString()
+    };
+    
+    parents.push(newParent);
+    localStorage.setItem('playAreaParents', JSON.stringify(parents));
+    
+    return newParent.id;
+}
+
+// Get parent by ID
+function getParentById(parentId) {
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    return parents.find(p => p.id === parentId);
+}
+
+// Save child to local storage
+function saveChild(childName, childAge, parentId) {
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    
+    // Check if child already exists (by name and parent)
+    const existingChild = children.find(c => 
+        c.name.toLowerCase() === childName.toLowerCase() && 
+        c.parentId === parentId
+    );
+    
+    if (existingChild) {
+        // Update age if needed
+        if (existingChild.age !== parseInt(childAge)) {
+            existingChild.age = parseInt(childAge);
+        }
+        
+        // Increment visit count
+        existingChild.visitCount = (existingChild.visitCount || 0) + 1;
+        existingChild.lastVisit = new Date().toISOString();
+        
+        localStorage.setItem('playAreaChildren', JSON.stringify(children));
+        return existingChild.id;
+    }
+    
+    // Create new child
+    const newChild = {
+        id: generateUniqueId(),
+        name: childName,
+        age: parseInt(childAge),
+        parentId: parentId,
+        visitCount: 1,
+        firstVisit: new Date().toISOString(),
+        lastVisit: new Date().toISOString()
+    };
+    
+    children.push(newChild);
+    localStorage.setItem('playAreaChildren', JSON.stringify(children));
+    
+    return newChild.id;
+}
+
+// Check in a child
+function checkInChild(childId, parentId) {
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    
+    // Get parent for adults count
+    const parent = parents.find(p => p.id === parentId);
+    const adultsCount = parent ? parent.adultsCount : 1;
+    
+    // Create new visit record
+    const newVisit = {
+        id: generateUniqueId(),
+        childId: childId,
+        parentId: parentId,
+        checkInTime: new Date().toISOString(),
+        checkOutTime: null,
+        adultsCount: adultsCount,
+        active: true
+    };
+    
+    visits.push(newVisit);
+    localStorage.setItem('playAreaVisits', JSON.stringify(visits));
+    
+    // Update displays
+    loadActiveCustomers();
+    loadVisitorCounts();
+    loadCheckoutList();
+}
+
+// Generate QR Code
+function generateQRCode(parentId) {
+    // Show QR code display
+    const qrCodeDisplay = document.getElementById('qr-code-display');
+    qrCodeDisplay.style.display = 'block';
+    
+    // Generate QR code
+    const qrContainer = document.getElementById('qr-code-container');
+    qrContainer.innerHTML = '';
+    
+    // Create QR code data
+    const qrData = {
+        type: 'playAreaParent',
+        parentId: parentId
+    };
+    
+    // Generate QR code using qrcode.js library
+    QRCode.toCanvas(qrContainer, JSON.stringify(qrData), { width: 200 }, function(error) {
+        if (error) console.error(error);
+        
+        // Mark parent as having QR code generated
+        const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+        const parent = parents.find(p => p.id === parentId);
+        if (parent) {
+            parent.qrCodeGenerated = true;
+            localStorage.setItem('playAreaParents', JSON.stringify(parents));
+        }
+    });
+}
+
+// Download QR Code
+function downloadQRCode() {
+    const canvas = document.querySelector('#qr-code-container canvas');
+    if (!canvas) return;
+    
+    // Get parent name for filename
+    const parentName = document.getElementById('parent-name').value;
+    const fileName = `${parentName.replace(/\s+/g, '_')}_QR_Code.png`;
+    
+    // Create a temporary link
+    const link = document.createElement('a');
+    link.download = fileName;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+// QR Scanner variables
+let videoStream = null;
+let qrScanner = null;
+
+// Open QR Scanner
+function openQRScanner() {
+    const qrScannerModal = document.getElementById('qr-scanner-modal');
+    const videoElement = document.getElementById('qr-video');
+    
+    // Show QR scanner modal
+    qrScannerModal.style.display = 'flex';
+    
+    // Check if browser supports getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Your browser does not support camera access. Please use a modern browser.');
+        qrScannerModal.style.display = 'none';
+        return;
+    }
+    
+    // Access camera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(function(stream) {
+            videoStream = stream;
+            videoElement.srcObject = stream;
+            videoElement.play();
+            
+            // Start QR scanning
+            startQRScanning(videoElement);
+        })
+        .catch(function(error) {
+            console.error('Error accessing camera:', error);
+            alert('Could not access camera. Please make sure you have granted camera permissions.');
+            qrScannerModal.style.display = 'none';
+        });
+}
+
+// Start QR scanning
+function startQRScanning(videoElement) {
+    // This is where you would initialize the jsQR library
+    // For this implementation, we'll simulate scanning with a timeout
+    
+    // In a real implementation with jsQR:
+    /*
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const scanInterval = setInterval(() => {
+        if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+            canvas.height = videoElement.videoHeight;
+            canvas.width = videoElement.videoWidth;
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Scan for QR code
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            
+            if (code) {
+                clearInterval(scanInterval);
+                processQRCode(code.data);
+                stopQRScanner();
+                document.getElementById('qr-scanner-modal').style.display = 'none';
+            }
+        }
+    }, 100);
+    */
+    
+    // Simulate QR scanning for demo purposes
+    setTimeout(() => {
+        // Simulate finding a QR code
+        const demoParentId = getRandomParentId();
+        if (demoParentId) {
+            processQRCode(JSON.stringify({ type: 'playAreaParent', parentId: demoParentId }));
+        } else {
+            alert('No existing parents found. Please register a new parent.');
+        }
+        
+        // Close scanner
+        stopQRScanner();
+        document.getElementById('qr-scanner-modal').style.display = 'none';
+    }, 2000);
+}
+
+// Get a random parent ID for demo purposes
+function getRandomParentId() {
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    if (parents.length === 0) return null;
+    
+    const randomIndex = Math.floor(Math.random() * parents.length);
+    return parents[randomIndex].id;
+}
+
+// Process QR code data
+function processQRCode(qrData) {
+    try {
+        const data = JSON.parse(qrData);
+        
+        if (data.type === 'playAreaParent' && data.parentId) {
+            const parent = getParentById(data.parentId);
+            
+            if (parent) {
+                // Fill in parent information
+                document.getElementById('parent-name').value = parent.name;
+                document.getElementById('parent-email').value = parent.email || '';
+                document.getElementById('phone-number').value = parent.phoneNumber;
+                document.getElementById('adults-count').value = parent.adultsCount || 1;
+                
+                alert(`Welcome back, ${parent.name}! Your information has been loaded. Please continue with check-in.`);
+            } else {
+                alert('Parent not found. Please enter your information manually.');
+            }
+        } else {
+            alert('Invalid QR code. Please enter your information manually.');
+        }
+    } catch (error) {
+        console.error('Error processing QR code:', error);
+        alert('Could not process QR code. Please enter your information manually.');
+    }
+}
+
+// Stop QR scanner
+function stopQRScanner() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+}
+
+// Load active customers
+function loadActiveCustomers() {
+    const activeCustomersList = document.getElementById('active-customers-list');
+    if (!activeCustomersList) return;
+    
+    activeCustomersList.innerHTML = '';
+    
+    // Get data
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Get active visits (no checkout time)
+    const activeVisits = visits.filter(visit => !visit.checkOutTime);
+    
+    if (activeVisits.length === 0) {
+        // Show no active visitors message
+        document.getElementById('no-active-visitors').style.display = 'block';
+        return;
+    } else {
+        document.getElementById('no-active-visitors').style.display = 'none';
+    }
+    
+    // Group by parent for better organization
+    const parentGroups = {};
+    
+    activeVisits.forEach(visit => {
+        const child = children.find(c => c.id === visit.childId);
+        const parent = parents.find(p => p.id === visit.parentId);
+        
+        if (child && parent) {
+            if (!parentGroups[parent.id]) {
+                parentGroups[parent.id] = {
+                    parent: parent,
+                    children: []
+                };
+            }
+            
+            // Calculate duration
+            const checkInTime = new Date(visit.checkInTime);
+            const now = new Date();
+            const durationMs = now - checkInTime;
+            const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+            const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            const durationStr = `${durationHours}h ${durationMinutes}m`;
+            
+            parentGroups[parent.id].children.push({
+                child: child,
+                visit: visit,
+                duration: durationStr,
+                checkInTimeFormatted: formatDateTime(checkInTime)
+            });
+        }
+    });
+    
+    // Display grouped by parent
+    Object.values(parentGroups).forEach(group => {
+        // Add parent header row
+        const parentRow = document.createElement('tr');
+        parentRow.className = 'parent-row';
+        parentRow.innerHTML = `
+            <td colspan="7" class="parent-header">
+                <strong>${group.parent.name}</strong> - ${group.children.length} child(ren)
+            </td>
+        `;
+        activeCustomersList.appendChild(parentRow);
+        
+        // Add child rows
+        group.children.forEach(item => {
+            const row = document.createElement('tr');
+            
+            // Add regular-visitor class if visit count >= 3
+            if (item.child.visitCount >= 3) {
+                row.classList.add('regular-visitor');
+            }
+            
+            row.innerHTML = `
+                <td>${item.child.name}</td>
+                <td>${item.child.age}</td>
+                <td>${group.parent.name}</td>
+                <td>${item.checkInTimeFormatted}</td>
+                <td>${item.child.visitCount || 1}</td>
+                <td>${item.duration}</td>
+                <td>
+                    <button class="btn small-btn checkout-btn" data-visit-id="${item.visit.id}">
+                        <i class="fas fa-sign-out-alt"></i> Check Out
+                    </button>
+                </td>
+            `;
+            activeCustomersList.appendChild(row);
+        });
+        
+        // Add group checkout button if more than one child
+        if (group.children.length > 1) {
+            const groupCheckoutRow = document.createElement('tr');
+            groupCheckoutRow.className = 'group-checkout-row';
+            groupCheckoutRow.innerHTML = `
+                <td colspan="7" class="group-checkout-cell">
+                    <button class="btn warning-btn checkout-group-btn" data-parent-id="${group.parent.id}">
+                        <i class="fas fa-users"></i> Check Out All Children
+                    </button>
+                </td>
+            `;
+            activeCustomersList.appendChild(groupCheckoutRow);
+        }
+    });
+    
+    // Add event listeners to checkout buttons
+    const checkoutButtons = document.querySelectorAll('.checkout-btn');
+    checkoutButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const visitId = this.getAttribute('data-visit-id');
+            checkoutVisitor(visitId);
+        });
+    });
+    
+    // Add event listeners to group checkout buttons
+    const groupCheckoutButtons = document.querySelectorAll('.checkout-group-btn');
+    groupCheckoutButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const parentId = this.getAttribute('data-parent-id');
+            checkoutParentGroup(parentId);
+        });
+    });
+}
+
+// Load checkout list
+function loadCheckoutList() {
+    const checkoutList = document.getElementById('checkout-list');
+    if (!checkoutList) return;
+    
+    checkoutList.innerHTML = '';
+    
+    // Get data
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Get active visits (no checkout time)
+    const activeVisits = visits.filter(visit => !visit.checkOutTime);
+    
+    if (activeVisits.length === 0) {
+        // Show no active visitors message
+        document.getElementById('no-active-visitors-checkout').style.display = 'block';
+        return;
+    } else {
+        document.getElementById('no-active-visitors-checkout').style.display = 'none';
+    }
+    
+    // Group by parent for better organization
+    const parentGroups = {};
+    
+    activeVisits.forEach(visit => {
+        const child = children.find(c => c.id === visit.childId);
+        const parent = parents.find(p => p.id === visit.parentId);
+        
+        if (child && parent) {
+            if (!parentGroups[parent.id]) {
+                parentGroups[parent.id] = {
+                    parent: parent,
+                    children: []
+                };
+            }
+            
+            // Calculate duration
+            const checkInTime = new Date(visit.checkInTime);
+            const now = new Date();
+            const durationMs = now - checkInTime;
+            const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+            const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            const durationStr = `${durationHours}h ${durationMinutes}m`;
+            
+            parentGroups[parent.id].children.push({
+                child: child,
+                visit: visit,
+                duration: durationStr,
+                checkInTimeFormatted: formatDateTime(checkInTime)
+            });
+        }
+    });
+    
+    // Create table header
+    const headerRow = document.createElement('thead');
+    headerRow.innerHTML = `
+        <tr>
+            <th>Parent Name</th>
+            <th>Phone Number</th>
+            <th>Number of Children</th>
+            <th>Check-In Time</th>
+            <th>Duration</th>
+            <th>Actions</th>
+        </tr>
+    `;
+    checkoutList.appendChild(headerRow);
+    
+    // Create table body
+    const tbody = document.createElement('tbody');
+    
+    // Display one row per parent with all their children
+    Object.values(parentGroups).forEach(group => {
+        // Get earliest check-in time and calculate average duration
+        const earliestCheckIn = new Date(Math.min(...group.children.map(c => new Date(c.visit.checkInTime))));
+        const now = new Date();
+        const durationMs = now - earliestCheckIn;
+        const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+        const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        const durationStr = `${durationHours}h ${durationMinutes}m`;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${group.parent.name}</strong></td>
+            <td>${group.parent.phoneNumber}</td>
+            <td>${group.children.length} child(ren)</td>
+            <td>${formatDateTime(earliestCheckIn)}</td>
+            <td>${durationStr}</td>
+            <td>
+                <button class="btn large-btn checkout-btn checkout-group-btn" data-parent-id="${group.parent.id}">
+                    <i class="fas fa-sign-out-alt"></i> Check Out All Children
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    checkoutList.appendChild(tbody);
+    
+    // Add event listeners to group checkout buttons
+    const groupCheckoutButtons = document.querySelectorAll('.checkout-group-btn');
+    groupCheckoutButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const parentId = this.getAttribute('data-parent-id');
+            checkoutParentGroup(parentId);
+        });
+    });
+}
+
+// Checkout a visitor
+function checkoutVisitor(visitId) {
+    // Get data
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Find the visit
+    const visitIndex = visits.findIndex(v => v.id === visitId);
+    
+    if (visitIndex !== -1) {
+        // Update checkout time
+        visits[visitIndex].checkOutTime = new Date().toISOString();
+        visits[visitIndex].active = false;
+        
+        // Save updated data
+        localStorage.setItem('playAreaVisits', JSON.stringify(visits));
+        
+        // Refresh lists
+        loadActiveCustomers();
+        loadCheckoutList();
+        loadVisitorCounts();
+        loadVisitHistory();
+    }
+}
+
+// Checkout all children of a parent
+function checkoutParentGroup(parentId) {
+    showConfirmationModal(
+        'Group Checkout',
+        'Are you sure you want to check out all children for this parent?',
+        function() {
+            // Get data
+            const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+            
+            // Find all active visits for this parent
+            const now = new Date().toISOString();
+            let updated = false;
+            
+            visits.forEach(visit => {
+                if (visit.parentId === parentId && !visit.checkOutTime) {
+                    visit.checkOutTime = now;
+                    visit.active = false;
+                    updated = true;
+                }
+            });
+            
+            if (updated) {
+                // Save updated data
+                localStorage.setItem('playAreaVisits', JSON.stringify(visits));
+                
+                // Refresh lists
+                loadActiveCustomers();
+                loadCheckoutList();
+                loadVisitorCounts();
+                loadVisitHistory();
+            }
+        }
+    );
+}
+
+// Show group checkout modal
+function showGroupCheckoutModal() {
+    // Get data
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Get active visits (no checkout time)
+    const activeVisits = visits.filter(visit => !visit.checkOutTime);
+    
+    // Group by parent
+    const parentGroups = {};
+    
+    activeVisits.forEach(visit => {
+        if (!parentGroups[visit.parentId]) {
+            const parent = parents.find(p => p.id === visit.parentId);
+            if (parent) {
+                parentGroups[visit.parentId] = {
+                    parent: parent,
+                    childCount: 0
+                };
+            }
+        }
+        
+        if (parentGroups[visit.parentId]) {
+            parentGroups[visit.parentId].childCount++;
+        }
+    });
+    
+    // Create confirmation message with parent list
+    let message = 'Select a parent group to check out:<br><br>';
+    
+    Object.values(parentGroups).forEach(group => {
+        message += `<button class="btn group-select-btn" data-parent-id="${group.parent.id}">
+            ${group.parent.name} (${group.childCount} children)
+        </button><br>`;
+    });
+    
+    // Show modal with custom message
+    const modal = document.getElementById('confirmation-modal');
+    document.getElementById('modal-title').textContent = 'Group Checkout';
+    document.getElementById('modal-message').innerHTML = message;
+    
+    // Hide default confirm button
+    document.getElementById('modal-confirm').style.display = 'none';
+    
+    // Show modal
+    modal.style.display = 'block';
+    
+    // Add event listeners to group select buttons
+    const groupSelectButtons = document.querySelectorAll('.group-select-btn');
+    groupSelectButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const parentId = this.getAttribute('data-parent-id');
+            modal.style.display = 'none';
+            checkoutParentGroup(parentId);
+        });
+    });
+    
+    // Add event listener to cancel button
+    document.getElementById('modal-cancel').addEventListener('click', function() {
+        modal.style.display = 'none';
+        document.getElementById('modal-confirm').style.display = 'block'; // Restore confirm button
+    });
+}
+
+// Update visitor counts
+function loadVisitorCounts() {
+    // Get data
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Get active visits (no checkout time)
+    const activeVisits = visits.filter(visit => !visit.checkOutTime);
+    
+    // Count children (each visit is a child)
+    const childrenCount = activeVisits.length;
+    
+    // Count adults (sum of adultsCount from each unique parent)
+    const uniqueParents = {};
+    let adultsCount = 0;
+    
+    activeVisits.forEach(visit => {
+        if (!uniqueParents[visit.parentId]) {
+            uniqueParents[visit.parentId] = true;
+            adultsCount += visit.adultsCount || 1; // Default to 1 if not specified
+        }
+    });
+    
+    // Update display
+    document.getElementById('children-count').textContent = childrenCount;
+    document.getElementById('adults-count-display').textContent = adultsCount;
+    document.getElementById('total-count').textContent = childrenCount + adultsCount;
+}
+
+// Update visitor counts
+function updateVisitorCounts() {
+    loadVisitorCounts();
+}
+
+// Load visit history
+function loadVisitHistory() {
+    const historyList = document.getElementById('history-list');
+    if (!historyList) return;
+    
+    historyList.innerHTML = `
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Child Name</th>
+                <th>Age</th>
+                <th>Parent Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Check-In</th>
+                <th>Check-Out</th>
+                <th>Duration</th>
+                <th>Visits</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    `;
+    
+    // Get data
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Sort visits by check-in time (most recent first)
+    const sortedVisits = [...visits].sort((a, b) => {
+        return new Date(b.checkInTime) - new Date(a.checkInTime);
+    });
+    
+    // Display visits
+    sortedVisits.forEach(visit => {
+        const child = children.find(c => c.id === visit.childId);
+        const parent = parents.find(p => p.id === visit.parentId);
+        
+        if (child && parent) {
+            const row = document.createElement('tr');
+            
+            // Calculate duration if checked out
+            let duration = 'Still Active';
+            if (visit.checkOutTime) {
+                const checkInTime = new Date(visit.checkInTime);
+                const checkOutTime = new Date(visit.checkOutTime);
+                const durationMs = checkOutTime - checkInTime;
+                const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+                const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                duration = `${durationHours}h ${durationMinutes}m`;
+            }
+            
+            row.innerHTML = `
+                <td><input type="checkbox" data-email="${parent.email || ''}"></td>
+                <td>${child.name}</td>
+                <td>${child.age}</td>
+                <td>${parent.name}</td>
+                <td>${parent.phoneNumber}</td>
+                <td>${parent.email || 'N/A'}</td>
+                <td>${formatDateTime(new Date(visit.checkInTime))}</td>
+                <td>${visit.checkOutTime ? formatDateTime(new Date(visit.checkOutTime)) : 'Active'}</td>
+                <td>${duration}</td>
+                <td>${child.visitCount || 1}</td>
+            `;
+            historyList.querySelector('tbody').appendChild(row);
+        }
+    });
+}
+
+// Filter active visitors
+function filterActiveVisitors() {
+    const visitCountFilter = document.getElementById('visit-count-filter').value;
+    const ageFilter = document.getElementById('age-filter').value;
+    
+    const rows = document.querySelectorAll('#active-customers-list tr:not(.parent-row):not(.group-checkout-row)');
+    const parentRows = document.querySelectorAll('#active-customers-list tr.parent-row');
+    const groupRows = document.querySelectorAll('#active-customers-list tr.group-checkout-row');
+    
+    // Create a map to track which parents have visible children
+    const visibleParents = new Map();
+    const visibleChildrenCount = new Map();
+    
+    // First hide all rows
+    rows.forEach(row => {
+        row.style.display = 'none';
+    });
+    
+    parentRows.forEach(row => {
+        row.style.display = 'none';
+    });
+    
+    groupRows.forEach(row => {
+        row.style.display = 'none';
+    });
+    
+    // Then show matching rows
+    rows.forEach(row => {
+        const visitCountCell = row.cells[4]; // Visit count is in the 5th column (index 4)
+        const ageCell = row.cells[1]; // Age is in the 2nd column (index 1)
+        
+        if (visitCountCell && ageCell) {
+            const visitCount = parseInt(visitCountCell.textContent);
+            const age = parseInt(ageCell.textContent);
+            
+            let showByVisitCount = true;
+            let showByAge = true;
+            
+            // Check visit count filter
+            if (visitCountFilter !== 'all') {
+                const minVisits = parseInt(visitCountFilter);
+                showByVisitCount = visitCount >= minVisits;
+            }
+            
+            // Check age filter
+            if (ageFilter !== 'all') {
+                if (ageFilter === '0-2') {
+                    showByAge = age >= 0 && age <= 2;
+                } else if (ageFilter === '3-5') {
+                    showByAge = age >= 3 && age <= 5;
+                } else if (ageFilter === '6-8') {
+                    showByAge = age >= 6 && age <= 8;
+                } else if (ageFilter === '9-12') {
+                    showByAge = age >= 9 && age <= 12;
+                } else if (ageFilter === '13+') {
+                    showByAge = age >= 13;
+                }
+            }
+            
+            // Show row if it passes both filters
+            if (showByVisitCount && showByAge) {
+                row.style.display = '';
+                
+                // Find the parent row for this child
+                let currentRow = row.previousElementSibling;
+                while (currentRow && !currentRow.classList.contains('parent-row')) {
+                    currentRow = currentRow.previousElementSibling;
+                }
+                
+                if (currentRow) {
+                    currentRow.style.display = '';
+                    
+                    // Extract parent ID from the next group checkout row
+                    let nextRow = row.nextElementSibling;
+                    while (nextRow && !nextRow.classList.contains('group-checkout-row')) {
+                        nextRow = nextRow.nextElementSibling;
+                    }
+                    
+                    if (nextRow) {
+                        const checkoutBtn = nextRow.querySelector('.checkout-group-btn');
+                        if (checkoutBtn) {
+                            const parentId = checkoutBtn.getAttribute('data-parent-id');
+                            visibleParents.set(parentId, true);
+                            
+                            // Count visible children for this parent
+                            if (!visibleChildrenCount.has(parentId)) {
+                                visibleChildrenCount.set(parentId, 1);
+                            } else {
+                                visibleChildrenCount.set(parentId, visibleChildrenCount.get(parentId) + 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Update parent headers with correct child count
+    parentRows.forEach(row => {
+        if (row.style.display !== 'none') {
+            const headerCell = row.querySelector('.parent-header');
+            if (headerCell) {
+                const parentNameMatch = headerCell.innerHTML.match(/<strong>(.*?)<\/strong>/);
+                if (parentNameMatch) {
+                    const parentName = parentNameMatch[1];
+                    
+                    // Find the parent ID
+                    let nextRow = row.nextElementSibling;
+                    while (nextRow && !nextRow.classList.contains('group-checkout-row')) {
+                        nextRow = nextRow.nextElementSibling;
+                    }
+                    
+                    if (nextRow) {
+                        const checkoutBtn = nextRow.querySelector('.checkout-group-btn');
+                        if (checkoutBtn) {
+                            const parentId = checkoutBtn.getAttribute('data-parent-id');
+                            const count = visibleChildrenCount.get(parentId) || 0;
+                            headerCell.innerHTML = `<strong>${parentName}</strong> - ${count} child(ren)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Show group checkout rows for parents with visible children
+    groupRows.forEach(row => {
+        const checkoutBtn = row.querySelector('.checkout-group-btn');
+        if (checkoutBtn) {
+            const parentId = checkoutBtn.getAttribute('data-parent-id');
+            if (visibleParents.get(parentId)) {
+                row.style.display = '';
+            }
+        }
+    });
+    
+    // Show "no active visitors" message if no rows are visible
+    let anyVisible = false;
+    rows.forEach(row => {
+        if (row.style.display !== 'none') {
+            anyVisible = true;
+        }
+    });
+    
+    document.getElementById('no-active-visitors').style.display = anyVisible ? 'none' : 'block';
+}
+
+// Search customers
+function searchCustomers(searchTerm, listId) {
+    const rows = document.querySelectorAll(`#${listId} tr`);
+    searchTerm = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+}
+
+// Filter history by date
+function filterHistory() {
+    const dateFrom = document.getElementById('date-from').valueAsDate;
+    const dateTo = document.getElementById('date-to').valueAsDate;
+    const minVisits = parseInt(document.getElementById('history-visit-count-filter').value);
+    const maxAge = parseInt(document.getElementById('history-age-filter').value);
+    
+    if (!dateFrom || !dateTo) {
+        alert('Please select both from and to dates.');
+        return;
+    }
+    
+    // Set end of day for dateTo
+    dateTo.setHours(23, 59, 59, 999);
+    
+    const rows = document.querySelectorAll('#history-list tr');
+    
+    rows.forEach(row => {
+        // Skip header row
+        if (row.querySelector('th')) return;
+        
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 8) { // Ensure enough cells for all data points
+            const checkInTimeStr = cells[3].textContent;
+            const checkInTime = parseDateTime(checkInTimeStr);
+            const visitCount = parseInt(cells[7].textContent); // Assuming Visit Count is the 8th column (index 7)
+            const childAge = parseInt(cells[1].textContent); // Assuming Age is the 2nd column (index 1)
+            
+            let isVisible = true;
+            
+            // Date filter
+            if (!(checkInTime >= dateFrom && checkInTime <= dateTo)) {
+                isVisible = false;
+            }
+            
+            // Visit Count filter
+            if (visitCount < minVisits) {
+                isVisible = false;
+            }
+            
+            // Age filter
+            if (childAge > maxAge) {
+                isVisible = false;
+            }
+            
+            row.style.display = isVisible ? '' : 'none';
+        }
+    });
+}
+
+// Delete history
+function deleteHistory() {
+    // Get data
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Calculate date 30 days ago
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // Filter out old records
+    const newVisits = visits.filter(visit => {
+        const checkInTime = new Date(visit.checkInTime);
+        return checkInTime >= thirtyDaysAgo || !visit.checkOutTime; // Keep active visits
+    });
+    
+    // Save updated data
+    localStorage.setItem('playAreaVisits', JSON.stringify(newVisits));
+    
+    // Refresh history
+    loadVisitHistory();
+    
+    alert('Old records have been deleted.');
+}
+
+// Delete all data
+function deleteAllData() {
+    // Clear all data
+    localStorage.setItem('playAreaParents', JSON.stringify([]));
+    localStorage.setItem('playAreaChildren', JSON.stringify([]));
+    localStorage.setItem('playAreaVisits', JSON.stringify([]));
+    
+    // Refresh all views
+    loadActiveCustomers();
+    loadCheckoutList();
+    loadVisitorCounts();
+    loadVisitHistory();
+    
+    alert('All data has been deleted.');
+}
+
+// Create backup
+function createBackup() {
+    // Get all data
+    const data = {
+        parents: JSON.parse(localStorage.getItem('playAreaParents')),
+        children: JSON.parse(localStorage.getItem('playAreaChildren')),
+        visits: JSON.parse(localStorage.getItem('playAreaVisits')),
+        timestamp: new Date().toISOString()
+    };
+    
+    // Convert to JSON string
+    const json = JSON.stringify(data);
+    
+    // Create download link
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `play_area_backup_${formatDateForFilename(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Restore backup
+function restoreBackup() {
+    // Create file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                // Validate data structure
+                if (!data.parents || !data.children || !data.visits) {
+                    throw new Error('Invalid backup file format');
+                }
+                
+                // Restore data
+                localStorage.setItem('playAreaParents', JSON.stringify(data.parents));
+                localStorage.setItem('playAreaChildren', JSON.stringify(data.children));
+                localStorage.setItem('playAreaVisits', JSON.stringify(data.visits));
+                
+                // Refresh all views
+                loadActiveCustomers();
+                loadCheckoutList();
+                loadVisitorCounts();
+                loadVisitHistory();
+                
+                alert('Backup restored successfully.');
+            } catch (error) {
+                alert('Error restoring backup: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
+}
+
+// Export data to CSV
+function exportData() {
+    // Get data
+    const parents = JSON.parse(localStorage.getItem('playAreaParents'));
+    const children = JSON.parse(localStorage.getItem('playAreaChildren'));
+    const visits = JSON.parse(localStorage.getItem('playAreaVisits'));
+    
+    // Create CSV content
+    let csv = 'Child Name,Age,Parent Name,Parent Email,Phone Number,Check-In Time,Check-Out Time,Duration,Visit Count\n';
+    
+    visits.forEach(visit => {
+        const child = children.find(c => c.id === visit.childId);
+        const parent = parents.find(p => p.id === visit.parentId);
+        
+        if (child && parent) {
+            // Calculate duration if checked out
+            let duration = 'Still Active';
+            if (visit.checkOutTime) {
+                const checkInTime = new Date(visit.checkInTime);
+                const checkOutTime = new Date(visit.checkOutTime);
+                const durationMs = checkOutTime - checkInTime;
+                const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+                const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                duration = `${durationHours}h ${durationMinutes}m`;
+            }
+            
+            // Format CSV row
+            csv += `"${child.name}",${child.age},"${parent.name}","${parent.email || ''}","${parent.phoneNumber}","${formatDateTime(new Date(visit.checkInTime))}","${visit.checkOutTime ? formatDateTime(new Date(visit.checkOutTime)) : 'Active'}","${duration}",${child.visitCount || 1}\n`;
+        }
+    });
+    
+    // Create download link
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `play_area_data_${formatDateForFilename(new Date())}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Send bulk email to all customers
+function sendBulkEmail() {
+    const subject = document.getElementById('email-subject').value;
+    const body = document.getElementById('email-body').value;
+    
+    if (!subject || !body) {
+        alert('Please enter both subject and message for the email.');
+        return;
+    }
+    
+    // Get all selected parents' email addresses
+    const checkboxes = document.querySelectorAll('#history-list input[type="checkbox"]:checked');
+    const selectedEmails = [];
+    
+    checkboxes.forEach(checkbox => {
+        const email = checkbox.getAttribute('data-email');
+        if (email && email.trim() !== '') {
+            selectedEmails.push(email);
+        }
+    });
+    
+    if (selectedEmails.length === 0) {
+        alert('Please select at least one parent with a valid email address from the history table.');
+        return;
+    }
+    
+    // Create the mailto link
+    const bccList = selectedEmails.join(',');
+    const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&bcc=${encodeURIComponent(bccList)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open the link in a new tab
+    window.open(mailtoLink, '_blank');
+    
+    // Hide the email template container and show the bulk email button
+    document.getElementById('email-template-container').style.display = 'none';
+    document.getElementById('send-bulk-email-btn').style.display = 'block';
+    document.getElementById('email-subject').value = '';
+    document.getElementById('email-body').value = '';
+}
+
+// Show confirmation modal
+function showConfirmationModal(title, message, confirmCallback) {
+    const modal = document.getElementById('confirmation-modal');
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-message').textContent = message;
+    
+    // Show modal
+    modal.style.display = 'block';
+    
+    // Set up confirm button
+    const confirmButton = document.getElementById('modal-confirm');
+    const cancelButton = document.getElementById('modal-cancel');
+    
+    // Remove existing event listeners
+    const newConfirmButton = confirmButton.cloneNode(true);
+    const newCancelButton = cancelButton.cloneNode(true);
+    confirmButton.parentNode.replaceChild(newConfirmButton, confirmButton);
+    cancelButton.parentNode.replaceChild(newCancelButton, cancelButton);
+    
+    // Add new event listeners
+    newConfirmButton.addEventListener('click', function() {
+        modal.style.display = 'none';
+        confirmCallback();
+    });
+    
+    newCancelButton.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    
+    // Close when clicking on X
+    const closeButton = modal.querySelector('.close-modal');
+    closeButton.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+}
+
+// Format date and time for display
+function formatDateTime(date) {
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+}
+
+// Parse date and time from formatted string
+function parseDateTime(dateTimeStr) {
+    // Example format: "11/02/2025, 01:30 PM"
+    const [datePart, timePart] = dateTimeStr.split(', ');
+    const [month, day, year] = datePart.split('/');
+    let [time, period] = timePart.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    // Convert to 24-hour format
+    hours = parseInt(hours);
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    
+    return new Date(year, month - 1, day, hours, minutes);
+}
+
+// Format date for filename
+function formatDateForFilename(date) {
+    return date.toISOString().split('T')[0];
+}

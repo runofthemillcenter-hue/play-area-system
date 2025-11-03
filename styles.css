@@ -1,0 +1,633 @@
+/* Main Styles for Run Of The Mill Play Centre Check-In/Out System */
+
+/* Variables */
+:root {
+    --primary-color: #4caf50;
+    --primary-dark: #388e3c;
+    --secondary-color: #2196f3;
+    --danger-color: #f44336;
+    --warning-color: #ff9800;
+    --light-gray: #f5f5f5;
+    --medium-gray: #e0e0e0;
+    --dark-gray: #757575;
+    --text-color: #333333;
+    --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --border-radius: 8px;
+    --transition: all 0.3s ease;
+    --brand-red: #e53935;
+    --brand-yellow: #fdd835;
+    --brand-blue: #1e88e5;
+}
+
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background-color: #f9f9f9;
+    color: var(--text-color);
+    line-height: 1.6;
+    -webkit-tap-highlight-color: transparent; /* Removes tap highlight on Android */
+    font-size: 18px; /* Increased base font size for tablet */
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 15px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.brand-logo h1 {
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+    line-height: 1.2;
+}
+
+.brand-red {
+    color: var(--brand-red);
+}
+
+.brand-yellow {
+    color: var(--brand-yellow);
+}
+
+.brand-blue {
+    color: var(--brand-blue);
+}
+
+.brand-text {
+    color: var(--text-color);
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 25px;
+    border-bottom: 1px solid var(--medium-gray);
+    flex-wrap: wrap;
+}
+
+.main-actions-container {
+    display: flex;
+    flex: 1;
+    max-width: 600px; /* Limit size for better visual grouping */
+    margin: 0 10px;
+    padding: 10px;
+    background-color: var(--light-gray); /* Different color for visibility */
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.main-actions-container .tab-btn {
+    flex: 1;
+    min-width: 150px;
+    font-size: 1.2rem;
+    padding: 20px 15px;
+}
+
+.tab-btn {
+    padding: 15px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--dark-gray);
+    transition: var(--transition);
+    position: relative;
+    text-align: center;
+    min-width: 100px;
+    min-height: 60px; /* Increased for better touch targets */
+}
+
+.tab-btn:hover {
+    color: var(--primary-color);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: var(--primary-color);
+}
+
+/* Tab Content */
+.tab-content {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 25px 20px;
+    min-height: 500px;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.tab-pane h2 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.tab-pane h3 {
+    color: var(--secondary-color);
+    margin: 20px 0 15px;
+    font-size: 1.4rem;
+}
+
+/* Forms */
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="tel"],
+input[type="email"],
+input[type="email"],
+input[type="date"],
+select {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid var(--medium-gray);
+    border-radius: var(--border-radius);
+    font-size: 18px; /* Prevents iOS zoom on focus */
+    transition: var(--transition);
+    -webkit-appearance: none; /* Removes default styling on iOS */
+    height: 60px; /* Consistent height for all inputs */
+}
+
+input:focus,
+select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+}
+
+.required {
+    color: var(--danger-color);
+}
+
+/* Buttons */
+.btn {
+    padding: 15px 25px;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: bold;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    touch-action: manipulation; /* Improves touch response */
+    -webkit-appearance: none; /* Removes default styling on iOS */
+    min-height: 60px; /* Increased for better touch targets */
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: white;
+    width: 100%; /* Full width on mobile */
+    margin-top: 15px;
+    font-size: 1.4rem; /* Larger font for primary buttons - changed from 1.3rem to 1.4rem */
+    padding: 20px 30px; /* Larger padding for primary buttons - changed from 20px 25px to 20px 30px */
+    min-height: 70px; /* Taller primary buttons */
+}
+
+.primary-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+.secondary-btn {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.secondary-btn:hover {
+    background-color: #1976d2;
+}
+
+.danger-btn {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.danger-btn:hover {
+    background-color: #d32f2f;
+}
+
+.warning-btn {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+.warning-btn:hover {
+    background-color: #f57c00;
+}
+
+/* Checkout Button - Extra Large */
+.checkout-btn {
+    font-size: 1.4rem;
+    padding: 20px 30px;
+    width: 100%;
+    margin-bottom: 10px;
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.checkout-btn:hover {
+    background-color: #d32f2f;
+}
+
+/* QR Code Scanner Section */
+.qr-scanner-section {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 20px;
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+}
+
+.qr-scanner-section .btn {
+    margin-bottom: 10px;
+}
+
+.scanner-description {
+    color: var(--dark-gray);
+    font-style: italic;
+}
+
+/* QR Code Display */
+.qr-code-display {
+    text-align: center;
+    padding: 25px;
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+    margin: 20px auto;
+    max-width: 400px;
+}
+
+#qr-code-container {
+    margin: 20px auto;
+    padding: 15px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+#qr-code-container canvas {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Group Checkout Section */
+.group-checkout-section {
+    text-align: center;
+    margin-top: 25px;
+    padding: 20px;
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+}
+
+.group-description {
+    color: var(--dark-gray);
+    font-style: italic;
+    margin-top: 10px;
+}
+
+/* Visitor Stats */
+.visitor-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.stat-card {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 180px;
+    border-left: 5px solid var(--primary-color);
+}
+
+.stat-card:nth-child(2) {
+    border-left-color: var(--secondary-color);
+}
+
+.stat-card:nth-child(3) {
+    border-left-color: var(--warning-color);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-right: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+}
+
+.stat-card:nth-child(2) .stat-icon {
+    color: var(--secondary-color);
+}
+
+.stat-card:nth-child(3) .stat-icon {
+    color: var(--warning-color);
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.stat-label {
+    color: var(--dark-gray);
+    font-size: 1rem;
+    margin-top: 5px;
+}
+
+/* Filter Controls */
+.filter-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.filter-group select {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--medium-gray);
+    font-size: 1rem;
+}
+
+/* Tables */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    margin-bottom: 20px;
+}
+
+.customers-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    min-width: 800px; /* Ensures table doesn't get too compressed */
+}
+
+.customers-table th,
+.customers-table td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--medium-gray);
+}
+
+.customers-table th {
+    background-color: var(--light-gray);
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    font-size: 1.05rem;
+}
+
+.customers-table tr:hover {
+    background-color: rgba(76, 175, 80, 0.05);
+}
+
+/* Regular Visitor Styling */
+.regular-visitor {
+    background-color: rgba(33, 150, 243, 0.1);
+}
+
+.regular-visitor td {
+    font-weight: bold;
+}
+
+.visit-count {
+    text-align: center;
+}
+
+/* Parent Group Styling */
+.parent-group {
+    border-top: 3px solid var(--secondary-color);
+}
+
+.parent-group-actions {
+    background-color: rgba(33, 150, 243, 0.05);
+    text-align: right;
+}
+
+/* No Visitors Message */
+.no-visitors-message {
+    text-align: center;
+    padding: 40px 20px;
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+    margin-top: 25px;
+}
+
+.no-visitors-message p {
+    margin-bottom: 20px;
+    color: var(--dark-gray);
+    font-style: italic;
+    font-size: 1.1rem;
+}
+
+.no-visitors-message button {
+    width: auto;
+    margin: 0 auto;
+}
+
+/* Search */
+.search-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.search-container input {
+    width: 100%;
+    padding: 15px 45px 15px 15px;
+    border: 2px solid var(--medium-gray);
+    border-radius: var(--border-radius);
+    font-size: 18px; /* Prevents iOS zoom on focus */
+    height: 60px; /* Consistent height */
+}
+
+.search-container i {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--dark-gray);
+    font-size: 1.2rem;
+}
+
+/* Admin Menu Dropdown */
+.admin-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.admin-dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 200px;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.admin-dropdown-content .tab-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 15px;
+    border-bottom: 1px solid var(--medium-gray);
+}
+
+.admin-dropdown:hover .admin-dropdown-content {
+    display: block;
+}
+
+.admin-dropdown-btn {
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 15px 20px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .tabs {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        width: 100%;
+        text-align: left;
+        padding: 15px;
+        border-bottom: 1px solid var(--medium-gray);
+    }
+    
+    .tab-btn.active::after {
+        display: none;
+    }
+    
+    .tab-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    .visitor-stats {
+        flex-direction: column;
+    }
+    
+    .stat-card {
+        margin-bottom: 15px;
+    }
+    
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group label {
+        margin-bottom: 5px;
+    }
+    
+    .admin-dropdown-content {
+        position: static;
+        display: none;
+    }
+    
+    .admin-dropdown.active .admin-dropdown-content {
+        display: block;
+    }
+}
